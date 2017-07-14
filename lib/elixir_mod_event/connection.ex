@@ -39,25 +39,32 @@ defmodule FSModEvent.Connection do
   filter_fun returns true.
   """
   @spec start_listening(GenServer.server, fun) :: :ok
-  def start_listening(name, filter_fun \\ fn(_) -> true end) do
+  def start_listening(name, filter_fun \\ fn(_) -> true end)
+  def start_listening(name, filter_fun) when is_atom(name) do
     GenServer.cast name, {:start_listening, self(), filter_fun}
+  end
+  def start_listening(name, filter_fun) when is_tuple(name) do
+    GenServer.cast via_tuple(name), {:start_listening, self(), filter_fun}
   end
 
   @doc """
   Unregisters the caller process as a listener.
   """
   @spec stop_listening(GenServer.server) :: :ok
-  def stop_listening(name) do
+  def stop_listening(name) when is_atom(name) do
     GenServer.cast name, {:stop_listening, self()}
+  end
+  def stop_listening(name) when is_tuple(name) do
+    GenServer.cast via_tuple(name), {:stop_listening, self()}
   end
 
   @doc """
   Starts a connection to FreeSWITCH.
   """
   @spec start(
-    atom, String.t, Integer.t, String.t
+    atom | tuple, String.t, Integer.t, String.t
   ) :: GenServer.on_start
-  def start(name, host, port, password) do
+  def start(name, host, port, password) when is_atom(name) do
     options = [
       host: host,
       port: port,
@@ -66,14 +73,23 @@ defmodule FSModEvent.Connection do
     ]
     GenServer.start __MODULE__, options, name: name
   end
+  def start(name, host, port, password) when is_tuple(name) do
+    options = [
+      host: host,
+      port: port,
+      password: password,
+      name: name
+    ]
+    GenServer.start __MODULE__, options, name: via_tuple(name)
+  end
 
   @doc """
   Starts and links a connection to FreeSWITCH.
   """
   @spec start_link(
-    atom, String.t, Integer.t, String.t
+    atom | tuple, String.t, Integer.t, String.t
   ) :: GenServer.on_start
-  def start_link(name, host, port, password) do
+  def start_link(name, host, port, password) when is_atom(name) do
     options = [
       host: host,
       port: port,
@@ -81,6 +97,15 @@ defmodule FSModEvent.Connection do
       name: name
     ]
     GenServer.start_link __MODULE__, options, name: name
+  end
+  def start_link(name, host, port, password) when is_tuple(name) do
+    options = [
+      host: host,
+      port: port,
+      password: password,
+      name: name
+    ]
+    GenServer.start_link __MODULE__, options, name: via_tuple(name)
   end
 
   @doc """
@@ -100,7 +125,11 @@ defmodule FSModEvent.Connection do
   See: https://freeswitch.org/confluence/display/FREESWITCH/mod_event_socket#mod_event_socket-bgapi
   """
   @spec bgapi(GenServer.server, String.t, String.t) :: String.t
-  def bgapi(name, command, args \\ "") do
+  def bgapi(name, command, args \\ "")
+  def bgapi(name, command, args) when is_atom(name) do
+    GenServer.call name, {:bgapi, self(), command, args}
+  end
+  def bgapi(name, command, args) when is_tuple(name) do
     GenServer.call name, {:bgapi, self(), command, args}
   end
 
@@ -465,13 +494,20 @@ defmodule FSModEvent.Connection do
     block_send name, payload
   end
 
-  defp block_send(name, command) do
+  defp block_send(name, command) when is_atom(name) do
     GenServer.call name, {:send, command}
+  end
+  defp block_send(name, command) when is_tuple(name) do
+    GenServer.call via_tuple(name), {:send, command}
   end
 
   defp cmd_send(socket, command) do
     c = "#{command}\n\n"
     Logger.debug "Sending #{c}"
     :ok = :gen_tcp.send socket, c
+  end
+
+  defp via_tuple(name) do
+    {:via, :gproc, {:n, :l, {:freeswitch, name}}}
   end
 end
