@@ -18,9 +18,13 @@ defmodule FSModEvent.Connection do
   See the License for the specific language governing permissions and
   limitations under the License.
   """
-  alias FSModEvent.Packet, as: Packet
   use GenServer
+
+  alias FSModEvent.Packet
+  alias FSModEvent.Connection
+
   require Logger
+
   defstruct name: nil,
     host: nil,
     port: nil,
@@ -30,9 +34,13 @@ defmodule FSModEvent.Connection do
     state: nil,
     sender: nil,
     jobs: %{},
-    listeners: %{}
+    listeners: %{},
+    failure_count: 0
 
-  @typep t :: %FSModEvent.Connection{}
+  @typep t :: %Connection{}
+
+  @max_retries 10
+  @retry_interval 1000
 
   @doc """
   Registers the caller process as a receiver for all the events for which the
@@ -323,22 +331,13 @@ defmodule FSModEvent.Connection do
   @spec init([term]) :: {:ok, FSModEvent.Connection.t} | no_return
   def init(options) do
     Logger.info "Starting FS connection"
-    {:ok, socket} = :gen_tcp.connect(
-      to_char_list(options[:host]), options[:port], [
-        packet: 0, active: :once, mode: :list
-      ]
-    )
-    {:ok, %FSModEvent.Connection{
-      name: options[:name],
-      host: options[:host],
-      port: options[:port],
-      password: options[:password],
-      socket: socket,
-      buffer: '',
-      sender: nil,
-      state: :connecting,
-      jobs: %{}
-    }}
+    config_options = [packet: 0, active: :once, mode: :list]
+    state = apply_options_to_initial_state(options)
+
+    case :gen_tcp.connect(to_char_list(options[:host]), options[:port], config_options) do
+      {:ok, socket}     -> {:ok, %{state | socket: socket}}
+      {:error, _reason} -> {:ok, %{state | failure_count: 1}, @retry_interval}
+    end
   end
 
   @spec handle_call(
@@ -390,6 +389,19 @@ defmodule FSModEvent.Connection do
     handle_cast {:stop_listening, pid}, state
   end
 
+  def handle_info(:timeout, %Connection{failure_count: failure_count} = state) do
+    if failure_count < @max_retries do
+      case :gen_tcp.connect(state.host, state.port, []) do
+        {:ok, _socket} ->
+          {:noreply, %{state | failure_count: 0}}
+        {:error, _reason} ->
+          {:noreply, %{state | failure_count: failure_count + 1}, @retry_interval}
+      end
+    else
+      {:stop, :max_retry_exceeded, state}
+    end
+  end
+
   def handle_info({:tcp, socket, data}, state) do
     :inet.setopts(socket, active: :once)
 
@@ -401,7 +413,14 @@ defmodule FSModEvent.Connection do
 
   def handle_info({:tcp_closed, _}, state) do
     Logger.info "Connection closed"
-    {:stop, :normal, state}
+    case :gen_tcp.connect(state.host, state.port, []) do
+      {:ok, _socket} ->
+        new_state = %{state | failure_count: 0}
+        {:noreply, new_state}
+      {:error, _reason} ->
+        new_state = %{state | failure_count: 1}
+        {:noreply, new_state, @retry_interval}
+    end
   end
 
   def handle_info(message, state) do
@@ -509,5 +528,18 @@ defmodule FSModEvent.Connection do
 
   defp via_tuple(name) do
     {:via, :gproc, {:n, :l, {:freeswitch, name}}}
+  end
+
+  defp apply_options_to_initial_state(options) do
+    %FSModEvent.Connection{
+      name: options[:name],
+      host: options[:host],
+      port: options[:port],
+      password: options[:password],
+      buffer: '',
+      sender: nil,
+      state: :connecting,
+      jobs: %{}
+    }
   end
 end
