@@ -41,6 +41,7 @@ defmodule FSModEvent.Connection do
 
   @max_retries 10
   @retry_interval 1000
+  @config_options [packet: 0, active: :once, mode: :list]
 
   @doc """
   Registers the caller process as a receiver for all the events for which the
@@ -331,10 +332,9 @@ defmodule FSModEvent.Connection do
   @spec init([term]) :: {:ok, FSModEvent.Connection.t} | no_return
   def init(options) do
     Logger.info "Starting FS connection"
-    config_options = [packet: 0, active: :once, mode: :list]
     state = apply_options_to_initial_state(options)
 
-    case :gen_tcp.connect(to_char_list(options[:host]), options[:port], config_options) do
+    case :gen_tcp.connect(state.host, state.port, @config_options) do
       {:ok, socket}     -> {:ok, %{state | socket: socket}}
       {:error, _reason} -> {:ok, %{state | failure_count: 1}, @retry_interval}
     end
@@ -391,7 +391,7 @@ defmodule FSModEvent.Connection do
 
   def handle_info(:timeout, %Connection{failure_count: failure_count} = state) do
     if failure_count < @max_retries do
-      case :gen_tcp.connect(state.host, state.port, []) do
+      case :gen_tcp.connect(state.host, state.port, @config_options) do
         {:ok, _socket} ->
           {:noreply, %{state | failure_count: 0}}
         {:error, _reason} ->
@@ -413,7 +413,7 @@ defmodule FSModEvent.Connection do
 
   def handle_info({:tcp_closed, _}, state) do
     Logger.info "Connection closed"
-    case :gen_tcp.connect(state.host, state.port, []) do
+    case :gen_tcp.connect(state.host, state.port, @config_options) do
       {:ok, _socket} ->
         new_state = %{state | failure_count: 0}
         {:noreply, new_state}
@@ -533,7 +533,7 @@ defmodule FSModEvent.Connection do
   defp apply_options_to_initial_state(options) do
     %FSModEvent.Connection{
       name: options[:name],
-      host: options[:host],
+      host: to_char_list(options[:host]),
       port: options[:port],
       password: options[:password],
       buffer: '',
