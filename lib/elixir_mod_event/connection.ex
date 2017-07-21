@@ -335,8 +335,12 @@ defmodule FSModEvent.Connection do
     state = apply_options_to_initial_state(options)
 
     case :gen_tcp.connect(state.host, state.port, @config_options) do
-      {:ok, socket}     -> {:ok, %{state | socket: socket}}
-      {:error, _reason} -> {:ok, %{state | failure_count: 1}, @retry_interval}
+      {:ok, socket}     ->
+        Logger.info(fn -> "Connected to #{state.host}:#{state.port}" end)
+        {:ok, %{state | socket: socket}}
+      {:error, _reason} ->
+        Logger.info(fn -> "Connection to #{state.host}:#{state.port} failed. Retrying" end)
+        {:ok, %{state | failure_count: 1}, @retry_interval}
     end
   end
 
@@ -390,11 +394,14 @@ defmodule FSModEvent.Connection do
   end
 
   def handle_info(:timeout, %Connection{failure_count: failure_count} = state) do
+    Logger.info(fn -> "Reconnecting after timeout" end)
     if failure_count < @max_retries do
       case :gen_tcp.connect(state.host, state.port, @config_options) do
         {:ok, _socket} ->
+          Logger.info(fn -> "Reconnecting to #{state.host}:#{state.port} successful." end)
           {:noreply, %{state | failure_count: 0}}
         {:error, _reason} ->
+          Logger.info(fn -> "Reconnection to #{state.host}:#{state.port} Failed. Retrying" end)
           {:noreply, %{state | failure_count: failure_count + 1}, @retry_interval}
       end
     else
@@ -412,12 +419,14 @@ defmodule FSModEvent.Connection do
   end
 
   def handle_info({:tcp_closed, _}, state) do
-    Logger.info "Connection closed"
+    Logger.info "Connection closed. Reconnecting"
     case :gen_tcp.connect(state.host, state.port, @config_options) do
       {:ok, _socket} ->
+        Logger.info(fn -> "Successfully reconnected to #{state.host}:#{state.port}" end)
         new_state = %{state | failure_count: 0}
         {:noreply, new_state}
       {:error, _reason} ->
+        Logger.info(fn ->"Reconnect to #{state.host}:#{state.port} failed. Retrying" end)
         new_state = %{state | failure_count: 1}
         {:noreply, new_state, @retry_interval}
     end
