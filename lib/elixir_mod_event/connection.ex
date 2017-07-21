@@ -411,6 +411,8 @@ defmodule FSModEvent.Connection do
 
   def handle_info({:tcp, socket, data}, state) do
     :inet.setopts(socket, active: :once)
+    IO.puts "Received"
+    IO.inspect data
 
     buffer = state.buffer ++ data
     {rest, ps} = Packet.parse buffer
@@ -497,6 +499,7 @@ defmodule FSModEvent.Connection do
   end
 
   defp auth(socket, password) do
+    Logger.info(fn -> "Authenticating with password: #{password}" end)
     cmd_send socket, "auth #{password}"
   end
 
