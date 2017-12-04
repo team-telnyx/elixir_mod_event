@@ -164,8 +164,8 @@ defmodule FSModEvent.Connection do
   See: https://freeswitch.org/confluence/display/FREESWITCH/mod_event_socket#mod_event_socket-event
   """
   @spec event(GenServer.server, String.t) :: FSModEvent.Packet.t
-  def event(name, events) do
-    block_send name, "event plain #{events}"
+  def event(name, events, format \\ "plain") do
+    block_send name, "event #{format} #{events}"
   end
 
   @doc """
@@ -371,6 +371,7 @@ defmodule FSModEvent.Connection do
   def handle_cast({:start_listening, caller, filter_fun}, state) do
     key = Base.encode64 :erlang.term_to_binary(caller)
     listeners = Map.put state.listeners, key, %{pid: caller, filter: filter_fun}
+
     Process.monitor caller
     {:noreply, %FSModEvent.Connection{state | listeners: listeners}}
   end
@@ -413,6 +414,7 @@ defmodule FSModEvent.Connection do
     :inet.setopts(socket, active: :once)
 
     buffer = state.buffer ++ data
+
     {rest, ps} = Packet.parse buffer
     state = Enum.reduce ps, state, &process/2
     {:noreply, %FSModEvent.Connection{state | buffer: rest}}
@@ -463,6 +465,7 @@ defmodule FSModEvent.Connection do
     state = %FSModEvent.Connection{state: :connecting}
   ) do
     if pkt.success do
+      Logger.debug "Authenticated: #{inspect pkt}"
       %FSModEvent.Connection{state | state: :connected}
     else
       raise "Could not login to FS: #{inspect pkt}"
