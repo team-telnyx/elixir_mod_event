@@ -146,6 +146,6 @@ defmodule FSModEvent.Test.Packet do
   end
 
   defp read!(file) do
-    to_char_list File.read!("test/resources/#{file}")
+    to_charlist File.read!("test/resources/#{file}")
   end
 end

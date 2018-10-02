@@ -646,7 +646,7 @@ defmodule FSModEvent.Connection do
   defp apply_options_to_initial_state(options) do
     %FSModEvent.Connection{
       name: options[:name],
-      host: to_char_list(options[:host]),
+      host: to_charlist(options[:host]),
       port: options[:port],
       password: options[:password],
       buffer: '',
