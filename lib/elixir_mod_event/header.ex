@@ -20,13 +20,13 @@ defmodule FSModEvent.Header do
   Given a line terminated in \n tries to parse a header in the form:
   Key: Value\n
   """
-  @spec parse(char_list) :: {String.t, String.t, char_list} | :error
-  def parse(char_list) do
-    char_list |> parse_key |> parse_value |> normalize
+  @spec parse(charlist) :: {String.t, String.t, charlist} | :error
+  def parse(charlist) do
+    charlist |> parse_key |> parse_value |> normalize
   end
 
-  defp parse_key(char_list) do
-    parse_key char_list, []
+  defp parse_key(charlist) do
+    parse_key charlist, []
   end
 
   defp parse_key([c, ?:, 32|rest], acc) do

@@ -46,12 +46,12 @@ defmodule FSModEvent.Packet do
   buffer leftovers and the packets parsed.
   """
   @spec parse(
-    char_list, [FSModEvent.Packet.t]
-  ) :: {char_list, [FSModEvent.Packet.t]}
-  def parse(char_list, acc \\ []) do
-    pkt = parse_real char_list
+    charlist, [FSModEvent.Packet.t]
+  ) :: {charlist, [FSModEvent.Packet.t]}
+  def parse(charlist, acc \\ []) do
+    pkt = parse_real charlist
     if pkt.parse_error or not pkt.complete do
-      {char_list, Enum.reverse acc}
+      {charlist, Enum.reverse acc}
     else
       parse pkt.rest, [%FSModEvent.Packet{pkt | rest: nil} | acc]
     end

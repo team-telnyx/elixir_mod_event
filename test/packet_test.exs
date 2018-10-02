@@ -139,7 +139,6 @@ defmodule FSModEvent.Test.Packet do
       "event-name" => "CUSTOM",
       "event-uuid" => "ee38d831-c80a-4520-8249-7424fa353408",
       "hdr1" => "val1",
-      "content-length" => "57",
       "command" => "sendevent myeventito",
     }
     assert p.custom_payload === 'this is a custom payload this is a custom payload oh yeah'
