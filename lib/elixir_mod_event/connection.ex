@@ -403,7 +403,7 @@ defmodule FSModEvent.Connection do
     block_send(name, "noevents")
   end
 
-  @spec init([term]) :: {:ok, FSModEvent.Connection.t()} | no_return
+  @spec init([term]) :: {:ok, t()} | no_return
   def init(options) do
     Logger.info("Starting FS connection")
     state = apply_options_to_initial_state(options)
@@ -422,10 +422,10 @@ defmodule FSModEvent.Connection do
   @spec handle_call(
           term,
           term,
-          FSModEvent.Connection.t()
+          t()
         ) ::
-          {:noreply, FSModEvent.Connection.t()}
-          | {:reply, term, FSModEvent.Connection.t()}
+          {:noreply, t()}
+          | {:reply, term, t()}
   def handle_call({:bgapi, caller, command, args}, _from, state) do
     id = UUID.uuid4()
     cmd_send(state.socket, "bgapi #{command} #{args}\nJob-UUID: #{id}")
@@ -445,8 +445,8 @@ defmodule FSModEvent.Connection do
 
   @spec handle_cast(
           term,
-          FSModEvent.Connection.t()
-        ) :: {:noreply, FSModEvent.Connection.t()}
+          t()
+        ) :: {:noreply, t()}
   def handle_cast({:start_listening, caller, filter_fun}, state) do
     key = Base.encode64(:erlang.term_to_binary(caller))
     listeners = Map.put(state.listeners, key, %{pid: caller, filter: filter_fun})
@@ -468,8 +468,8 @@ defmodule FSModEvent.Connection do
 
   @spec handle_info(
           term,
-          FSModEvent.Connection.t()
-        ) :: {:noreply, FSModEvent.Connection.t()}
+          t()
+        ) :: {:noreply, t()}
   def handle_info({:DOWN, _, _, pid, _}, state) do
     handle_cast({:stop_listening, pid}, state)
   end
@@ -523,7 +523,7 @@ defmodule FSModEvent.Connection do
     {:noreply, state}
   end
 
-  @spec terminate(term, FSModEvent.Connection.t()) :: :ok
+  @spec terminate(term, t()) :: :ok
   def terminate(reason, _state) do
     Logger.info("Terminating with #{inspect(reason)}")
     :ok
@@ -531,9 +531,9 @@ defmodule FSModEvent.Connection do
 
   @spec code_change(
           term,
-          FSModEvent.Connection.t(),
+          t(),
           term
-        ) :: {:ok, FSModEvent.Connection.t()}
+        ) :: {:ok, t()}
   def code_change(_old_vsn, state, _extra) do
     {:ok, state}
   end
